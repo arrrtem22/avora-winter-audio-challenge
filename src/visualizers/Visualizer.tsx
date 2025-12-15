@@ -4,6 +4,8 @@ export interface VisualizerProps {
   frequencyData: React.RefObject<Uint8Array<ArrayBuffer>>
   timeDomainData: React.RefObject<Uint8Array<ArrayBuffer>>
   isActive: boolean
+  width: number
+  height: number
 }
 
 /**
@@ -13,13 +15,18 @@ export interface VisualizerProps {
  *   - frequencyData: Ref to Uint8Array of FFT frequency bins (0-255 values)
  *   - timeDomainData: Ref to Uint8Array of waveform samples (0-255 values)
  *   - isActive: boolean indicating if audio is streaming
+ *   - width: Canvas width (fixed, do not override)
+ *   - height: Canvas height (fixed, do not override)
  *
  * The data refs are updated in-place by the audio hook. This component
  * runs its own animation loop to read the data and render.
  *
+ * NOTE: Canvas dimensions are fixed at 320x240 (4:3) for side-by-side comparison.
+ * Use the width/height props for your drawing calculations.
+ *
  * The example below draws a simple waveform line. Replace it with your own!
  */
-export function Visualizer({ frequencyData, timeDomainData, isActive }: VisualizerProps) {
+export function Visualizer({ frequencyData, timeDomainData, isActive, width, height }: VisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -28,9 +35,6 @@ export function Visualizer({ frequencyData, timeDomainData, isActive }: Visualiz
 
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-
-    const width = canvas.width
-    const height = canvas.height
 
     // Draw placeholder when not active
     if (!isActive) {
@@ -64,8 +68,9 @@ export function Visualizer({ frequencyData, timeDomainData, isActive }: Visualiz
       let x = 0
 
       for (let i = 0; i < timeData.length; i++) {
-        const v = timeData[i] / 255
-        const y = v * height
+        // Center around 128 (silence) and map to canvas center
+        const normalized = (timeData[i] - 128) / 128
+        const y = height / 2 - normalized * (height / 2)
 
         if (i === 0) {
           ctx.moveTo(x, y)
@@ -87,14 +92,14 @@ export function Visualizer({ frequencyData, timeDomainData, isActive }: Visualiz
     return () => {
       cancelAnimationFrame(frameId)
     }
-  }, [isActive, frequencyData, timeDomainData])
+  }, [isActive, frequencyData, timeDomainData, width, height])
 
   return (
     <canvas
       ref={canvasRef}
-      width={800}
-      height={400}
-      style={{ display: 'block', margin: '0 auto' }}
+      width={width}
+      height={height}
+      style={{ display: 'block' }}
     />
   )
 }
