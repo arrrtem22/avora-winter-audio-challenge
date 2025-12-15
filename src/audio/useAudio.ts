@@ -1,14 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 export interface UseAudioOptions {
-  /**
-   * Optional pre-configured AnalyserNode. If provided, the hook will use this
-   * analyser and its AudioContext. The caller is responsible for the analyser's
-   * lifecycle - it won't be disconnected or have its context closed on stop().
-   *
-   * If not provided, a default AnalyserNode is created with fftSize=2048.
-   */
-  analyserNode?: AnalyserNode
+  /** AnalyserNode configuration (fftSize, smoothingTimeConstant, minDecibels, maxDecibels) */
+  analyser?: AnalyserOptions
+  /** MediaTrackConstraints for getUserMedia audio. Merged with defaults. */
+  audio?: MediaTrackConstraints
 }
 
 export interface UseAudioReturn {
@@ -26,7 +22,16 @@ export interface UseAudioReturn {
   stop: () => void
 }
 
-const DEFAULT_FFT_SIZE = 2048
+const DEFAULT_ANALYSER_OPTIONS: AnalyserOptions = {
+  fftSize: 2048,
+  smoothingTimeConstant: 0.8,
+}
+
+const DEFAULT_AUDIO_OPTIONS: MediaTrackConstraints = {
+  echoCancellation: false,
+  noiseSuppression: false,
+  autoGainControl: false,
+}
 
 /**
  * useAudio - A stable hook for accessing microphone audio data
@@ -37,7 +42,7 @@ const DEFAULT_FFT_SIZE = 2048
  * DO NOT MODIFY THIS FILE - This is the stable audio pipeline for the challenge.
  * Modify src/visualizers/Visualizer.tsx instead.
  */
-export function useAudio({ analyserNode }: UseAudioOptions = {}): UseAudioReturn {
+export function useAudio({ analyser, audio }: UseAudioOptions = {}): UseAudioReturn {
   const [isActive, setIsActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,9 +57,6 @@ export function useAudio({ analyserNode }: UseAudioOptions = {}): UseAudioReturn
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const animationFrameRef = useRef<number | null>(null)
-
-  // Track if user provided the analyser (we don't own it, don't clean it up)
-  const userProvidedAnalyserRef = useRef(false)
 
   // Track mounted state to prevent setState after unmount
   const mountedRef = useRef(true)
@@ -84,14 +86,11 @@ export function useAudio({ analyserNode }: UseAudioOptions = {}): UseAudioReturn
       sourceRef.current = null
     }
 
-    // Only cleanup analyser/context if we own them
-    if (!userProvidedAnalyserRef.current) {
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
-        audioContextRef.current = null
-      }
-      analyserRef.current = null
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
     }
+    analyserRef.current = null
 
     if (mountedRef.current) {
       setIsActive(false)
@@ -110,29 +109,19 @@ export function useAudio({ analyserNode }: UseAudioOptions = {}): UseAudioReturn
         setError(null)
       }
 
-      // Use provided analyser or create our own
-      if (analyserNode) {
-        userProvidedAnalyserRef.current = true
-        analyserRef.current = analyserNode
-        audioContextRef.current = analyserNode.context as AudioContext
-      } else {
-        userProvidedAnalyserRef.current = false
-        audioContextRef.current = new AudioContext()
-        analyserRef.current = audioContextRef.current.createAnalyser()
-        analyserRef.current.fftSize = DEFAULT_FFT_SIZE
-        analyserRef.current.smoothingTimeConstant = 0.8
-      }
+      // Create AudioContext and AnalyserNode with options
+      audioContextRef.current = new AudioContext()
+      analyserRef.current = new AnalyserNode(audioContextRef.current, {
+        ...DEFAULT_ANALYSER_OPTIONS,
+        ...analyser
+      })
 
       // Allocate buffers sized to the analyser
       frequencyData.current = new Uint8Array(analyserRef.current.frequencyBinCount)
       timeDomainData.current = new Uint8Array(analyserRef.current.fftSize)
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
-        }
+        audio: { ...DEFAULT_AUDIO_OPTIONS, ...audio }
       })
 
       // Check if session changed (stop() was called) or component unmounted
@@ -181,7 +170,7 @@ export function useAudio({ analyserNode }: UseAudioOptions = {}): UseAudioReturn
       }
       setIsActive(false)
     }
-  }, [analyserNode, stop])
+  }, [analyser, audio, stop])
 
   // Track mounted state and cleanup on unmount
   useEffect(() => {
