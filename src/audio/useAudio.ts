@@ -42,8 +42,9 @@ export function useAudio({ analyserNode }: UseAudioOptions = {}): UseAudioReturn
   const [error, setError] = useState<string | null>(null)
 
   // Audio data buffers - updated in-place, no React re-renders
-  const frequencyData = useRef(new Uint8Array(DEFAULT_FFT_SIZE / 2))
-  const timeDomainData = useRef(new Uint8Array(DEFAULT_FFT_SIZE))
+  // Initialized empty; start() allocates based on actual analyser fftSize
+  const frequencyData = useRef(new Uint8Array(0))
+  const timeDomainData = useRef(new Uint8Array(0))
 
   // Web Audio API refs
   const audioContextRef = useRef<AudioContext | null>(null)
