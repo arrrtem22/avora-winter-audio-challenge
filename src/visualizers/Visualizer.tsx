@@ -1,5 +1,11 @@
 import { useRef, useEffect } from 'react'
 
+export interface VisualizerProps {
+  frequencyData: Uint8Array
+  timeDomainData: Uint8Array
+  isActive: boolean
+}
+
 /**
  * Visualizer - YOUR CANVAS FOR THE CHALLENGE
  *
@@ -10,14 +16,16 @@ import { useRef, useEffect } from 'react'
  *
  * The example below draws a simple waveform line. Replace it with your own!
  */
-export function Visualizer({ frequencyData, timeDomainData, isActive }) {
-  const canvasRef = useRef(null)
+export function Visualizer({ frequencyData, timeDomainData, isActive }: VisualizerProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
     const width = canvas.width
     const height = canvas.height
 

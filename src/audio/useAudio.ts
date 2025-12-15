@@ -1,26 +1,35 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
+export interface UseAudioOptions {
+  fftSize?: number
+}
+
+export interface UseAudioReturn {
+  frequencyData: Uint8Array
+  timeDomainData: Uint8Array
+  isActive: boolean
+  error: string | null
+  start: () => Promise<void>
+  stop: () => void
+}
+
 /**
  * useAudio - A stable hook for accessing microphone audio data
  *
  * DO NOT MODIFY THIS FILE - This is the stable audio pipeline for the challenge.
- * Modify src/visualizers/Visualizer.jsx instead.
- *
- * @param {Object} options
- * @param {number} options.fftSize - FFT size for frequency analysis (default: 2048)
- * @returns {Object} Audio data and controls
+ * Modify src/visualizers/Visualizer.tsx instead.
  */
-export function useAudio({ fftSize = 2048 } = {}) {
+export function useAudio({ fftSize = 2048 }: UseAudioOptions = {}): UseAudioReturn {
   const [isActive, setIsActive] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [frequencyData, setFrequencyData] = useState(() => new Uint8Array(fftSize / 2))
   const [timeDomainData, setTimeDomainData] = useState(() => new Uint8Array(fftSize))
 
-  const audioContextRef = useRef(null)
-  const analyserRef = useRef(null)
-  const sourceRef = useRef(null)
-  const streamRef = useRef(null)
-  const animationFrameRef = useRef(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
 
   const stop = useCallback(() => {
     if (animationFrameRef.current) {
@@ -51,7 +60,6 @@ export function useAudio({ fftSize = 2048 } = {}) {
     try {
       setError(null)
 
-      const AudioContext = window.AudioContext || window.webkitAudioContext
       audioContextRef.current = new AudioContext()
 
       analyserRef.current = audioContextRef.current.createAnalyser()
@@ -88,12 +96,14 @@ export function useAudio({ fftSize = 2048 } = {}) {
 
       updateData()
     } catch (err) {
-      if (err.name === 'NotAllowedError') {
-        setError('Microphone permission denied')
-      } else if (err.name === 'NotFoundError') {
-        setError('No microphone found')
-      } else {
-        setError(err.message)
+      if (err instanceof Error) {
+        if (err.name === 'NotAllowedError') {
+          setError('Microphone permission denied')
+        } else if (err.name === 'NotFoundError') {
+          setError('No microphone found')
+        } else {
+          setError(err.message)
+        }
       }
       setIsActive(false)
     }

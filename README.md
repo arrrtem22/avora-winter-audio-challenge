@@ -13,7 +13,7 @@ Open http://localhost:5173 and allow microphone access when prompted.
 
 ## The Challenge
 
-Edit `src/visualizers/Visualizer.jsx` to create your own visualization.
+Edit `src/visualizers/Visualizer.tsx` to create your own visualization.
 
 You receive three props:
 
@@ -41,10 +41,10 @@ for (let i = 0; i < frequencyData.length; i++) {
 ```
 src/
 ├── audio/
-│   └── useAudio.js      # Audio pipeline (do not modify)
+│   └── useAudio.ts      # Audio pipeline (do not modify)
 ├── visualizers/
-│   └── Visualizer.jsx   # YOUR CODE GOES HERE
-├── App.jsx
+│   └── Visualizer.tsx   # YOUR CODE GOES HERE
+├── App.tsx
 └── App.css
 ```
 
