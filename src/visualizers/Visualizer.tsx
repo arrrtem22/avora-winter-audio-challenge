@@ -52,6 +52,7 @@ export function Visualizer({ frequencyData, timeDomainData, isActive, width, hei
 
     const draw = () => {
       const timeData = timeDomainData.current
+      const freqData = frequencyData.current
 
       // Clear canvas
       ctx.fillStyle = '#000'
@@ -59,18 +60,36 @@ export function Visualizer({ frequencyData, timeDomainData, isActive, width, hei
 
       // === YOUR VISUALIZATION CODE GOES HERE ===
 
-      // Example: Simple waveform line
+      const halfHeight = height / 2
+      const labelPadding = 6
+      const labelFontSize = 10
+      const horizontalPadding = 8
+      const drawWidth = width - horizontalPadding * 2
+
+      // Divider line
+      ctx.strokeStyle = '#333'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(0, halfHeight)
+      ctx.lineTo(width, halfHeight)
+      ctx.stroke()
+
+      // Top half: Waveform
+      ctx.fillStyle = '#666'
+      ctx.font = `${labelFontSize}px monospace`
+      ctx.textAlign = 'left'
+      ctx.fillText('Waveform', labelPadding, labelFontSize + labelPadding)
+
       ctx.beginPath()
       ctx.strokeStyle = '#0f0'
       ctx.lineWidth = 2
 
-      const sliceWidth = width / timeData.length
-      let x = 0
+      const sliceWidth = drawWidth / timeData.length
+      let x = horizontalPadding
 
       for (let i = 0; i < timeData.length; i++) {
-        // Center around 128 (silence) and map to canvas center
         const normalized = (timeData[i] - 128) / 128
-        const y = height / 2 - normalized * (height / 2)
+        const y = halfHeight / 2 - normalized * (halfHeight / 2)
 
         if (i === 0) {
           ctx.moveTo(x, y)
@@ -79,8 +98,33 @@ export function Visualizer({ frequencyData, timeDomainData, isActive, width, hei
         }
         x += sliceWidth
       }
-
       ctx.stroke()
+
+      // Bottom half: Frequency bars (centered/mirrored)
+      ctx.fillStyle = '#666'
+      ctx.font = `${labelFontSize}px monospace`
+      ctx.textAlign = 'left'
+      ctx.fillText('Frequency', labelPadding, halfHeight + labelFontSize + labelPadding)
+
+      const barCount = 64
+      const barWidth = drawWidth / barCount
+      const barGap = 1
+      const freqCenterY = halfHeight + halfHeight / 2
+
+      for (let i = 0; i < barCount; i++) {
+        const freqIndex = Math.floor(i * freqData.length / barCount)
+        const value = freqData[freqIndex] / 255
+        const barHeight = value * (halfHeight / 2)
+
+        ctx.fillStyle = '#0f0'
+        // Draw bar extending both up and down from center
+        ctx.fillRect(
+          horizontalPadding + i * barWidth + barGap / 2,
+          freqCenterY - barHeight,
+          barWidth - barGap,
+          barHeight * 2
+        )
+      }
 
       // === END VISUALIZATION CODE ===
 

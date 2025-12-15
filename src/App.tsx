@@ -6,13 +6,13 @@ import './App.css'
 /**
  * Fixed canvas dimensions for the challenge.
  * DO NOT MODIFY - visualizers will be displayed side-by-side for comparison.
- * Aspect ratio: 4:3 (320x240)
+ * Aspect ratio: 4:3 (640x480)
  */
-const CANVAS_WIDTH = 320
-const CANVAS_HEIGHT = 240
+const CANVAS_WIDTH = 640
+const CANVAS_HEIGHT = 480
 
 function App() {
-  const { frequencyData, timeDomainData, isActive, error, start } = useAudio()
+  const { frequencyData, timeDomainData, isActive, start } = useAudio()
 
   useEffect(() => {
     start()
@@ -20,11 +20,6 @@ function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>Avora Winter Waveform Challenge 2026</h1>
-        {error && <p className="error">{error}</p>}
-      </header>
-
       <main>
         <Visualizer
           frequencyData={frequencyData}

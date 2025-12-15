@@ -1,27 +1,8 @@
 .app {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-}
-
-header {
-  text-align: center;
-  margin-bottom: 0.5rem;
-}
-
-h1 {
-  font-size: 1rem;
-  font-weight: 400;
-  margin: 0;
-}
-
-.error {
-  color: #f44;
-  margin-top: 0.5rem;
-  font-size: 0.875rem;
 }
 
 main {
