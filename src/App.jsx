@@ -13,7 +13,7 @@ function App() {
   return (
     <div className="app">
       <header>
-        <h1>Waveform Challenge</h1>
+        <h1>Avora Winter Waveform Challenge 2026</h1>
         {error && <p className="error">{error}</p>}
       </header>
 

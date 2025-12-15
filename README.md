@@ -1,4 +1,4 @@
-# Waveform Visualization Challenge
+# Avora Winter Waveform Challenge 2026
 
 Create your own audio waveform visualization using real-time microphone input.
 
