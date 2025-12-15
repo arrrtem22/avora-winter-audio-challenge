@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 export interface UseAudioOptions {
-  fftSize?: number
+  /**
+   * Optional pre-configured AnalyserNode. If provided, the hook will use this
+   * analyser and its AudioContext. The caller is responsible for the analyser's
+   * lifecycle - it won't be disconnected or have its context closed on stop().
+   *
+   * If not provided, a default AnalyserNode is created with fftSize=2048.
+   */
+  analyserNode?: AnalyserNode
 }
 
 export interface UseAudioReturn {
@@ -19,6 +26,8 @@ export interface UseAudioReturn {
   stop: () => void
 }
 
+const DEFAULT_FFT_SIZE = 2048
+
 /**
  * useAudio - A stable hook for accessing microphone audio data
  *
@@ -28,13 +37,13 @@ export interface UseAudioReturn {
  * DO NOT MODIFY THIS FILE - This is the stable audio pipeline for the challenge.
  * Modify src/visualizers/Visualizer.tsx instead.
  */
-export function useAudio({ fftSize = 2048 }: UseAudioOptions = {}): UseAudioReturn {
+export function useAudio({ analyserNode }: UseAudioOptions = {}): UseAudioReturn {
   const [isActive, setIsActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Audio data buffers - updated in-place, no React re-renders
-  const frequencyData = useRef(new Uint8Array(fftSize / 2))
-  const timeDomainData = useRef(new Uint8Array(fftSize))
+  const frequencyData = useRef(new Uint8Array(DEFAULT_FFT_SIZE / 2))
+  const timeDomainData = useRef(new Uint8Array(DEFAULT_FFT_SIZE))
 
   // Web Audio API refs
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -43,31 +52,45 @@ export function useAudio({ fftSize = 2048 }: UseAudioOptions = {}): UseAudioRetu
   const streamRef = useRef<MediaStream | null>(null)
   const animationFrameRef = useRef<number | null>(null)
 
+  // Track if user provided the analyser (we don't own it, don't clean it up)
+  const userProvidedAnalyserRef = useRef(false)
+
   // Track mounted state to prevent setState after unmount
   const mountedRef = useRef(true)
 
+  // Session counter for StrictMode safety - prevents stale async operations
+  const sessionRef = useRef(0)
+
   const stop = useCallback(() => {
+    // Increment session to invalidate any pending async operations
+    sessionRef.current++
+
+    // Always cleanup animation frame
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current)
       animationFrameRef.current = null
     }
 
+    // Always cleanup stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
     }
 
+    // Always cleanup source (we always create it)
     if (sourceRef.current) {
       sourceRef.current.disconnect()
       sourceRef.current = null
     }
 
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
+    // Only cleanup analyser/context if we own them
+    if (!userProvidedAnalyserRef.current) {
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+        audioContextRef.current = null
+      }
+      analyserRef.current = null
     }
-
-    analyserRef.current = null
 
     if (mountedRef.current) {
       setIsActive(false)
@@ -78,22 +101,32 @@ export function useAudio({ fftSize = 2048 }: UseAudioOptions = {}): UseAudioRetu
     // Stop any existing session first
     stop()
 
+    // Capture current session for async safety
+    const currentSession = sessionRef.current
+
     try {
       if (mountedRef.current) {
         setError(null)
       }
 
-      audioContextRef.current = new AudioContext()
-
-      analyserRef.current = audioContextRef.current.createAnalyser()
-      analyserRef.current.fftSize = fftSize
-      analyserRef.current.smoothingTimeConstant = 0.8
+      // Use provided analyser or create our own
+      if (analyserNode) {
+        userProvidedAnalyserRef.current = true
+        analyserRef.current = analyserNode
+        audioContextRef.current = analyserNode.context as AudioContext
+      } else {
+        userProvidedAnalyserRef.current = false
+        audioContextRef.current = new AudioContext()
+        analyserRef.current = audioContextRef.current.createAnalyser()
+        analyserRef.current.fftSize = DEFAULT_FFT_SIZE
+        analyserRef.current.smoothingTimeConstant = 0.8
+      }
 
       // Allocate buffers sized to the analyser
       frequencyData.current = new Uint8Array(analyserRef.current.frequencyBinCount)
       timeDomainData.current = new Uint8Array(analyserRef.current.fftSize)
 
-      streamRef.current = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
@@ -101,20 +134,28 @@ export function useAudio({ fftSize = 2048 }: UseAudioOptions = {}): UseAudioRetu
         }
       })
 
-      // Check if we were stopped/unmounted during await
-      if (!mountedRef.current || !audioContextRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
+      // Check if session changed (stop() was called) or component unmounted
+      if (currentSession !== sessionRef.current || !mountedRef.current) {
+        stream.getTracks().forEach(track => track.stop())
         return
       }
 
-      sourceRef.current = audioContextRef.current.createMediaStreamSource(streamRef.current)
+      // Resume AudioContext - clicking "Allow" on mic prompt was the user gesture
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume()
+      }
+
+      streamRef.current = stream
+      sourceRef.current = audioContextRef.current.createMediaStreamSource(stream)
       sourceRef.current.connect(analyserRef.current)
 
       setIsActive(true)
 
       // Animation loop - updates refs in-place, no React involvement
       const updateData = () => {
-        if (!analyserRef.current) return
+        if (!analyserRef.current || currentSession !== sessionRef.current) {
+          return
+        }
 
         analyserRef.current.getByteFrequencyData(frequencyData.current)
         analyserRef.current.getByteTimeDomainData(timeDomainData.current)
@@ -124,7 +165,7 @@ export function useAudio({ fftSize = 2048 }: UseAudioOptions = {}): UseAudioRetu
 
       updateData()
     } catch (err) {
-      if (!mountedRef.current) return
+      if (!mountedRef.current || currentSession !== sessionRef.current) return
 
       if (err instanceof Error) {
         if (err.name === 'NotAllowedError') {
@@ -139,7 +180,7 @@ export function useAudio({ fftSize = 2048 }: UseAudioOptions = {}): UseAudioRetu
       }
       setIsActive(false)
     }
-  }, [fftSize, stop])
+  }, [analyserNode, stop])
 
   // Track mounted state and cleanup on unmount
   useEffect(() => {
