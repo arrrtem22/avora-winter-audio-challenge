@@ -24,13 +24,13 @@ export interface UseAudioReturn {
 
 const DEFAULT_ANALYSER_OPTIONS = {
   fftSize: 2048,
-  smoothingTimeConstant: 0.8,
+  smoothingTimeConstant: 0.5,
 } satisfies AnalyserOptions
 
 const DEFAULT_AUDIO_OPTIONS = {
   echoCancellation: false,
   noiseSuppression: false,
-  autoGainControl: false,
+  autoGainControl: true,
 } satisfies MediaTrackConstraints
 
 /**
