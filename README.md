@@ -2,6 +2,8 @@
 
 Create your own novel audio visualization using real-time microphone input.
 
+[Live Demo](https://avora-task.vercel.app)
+
 ## Quick Start
 
 ```bash
